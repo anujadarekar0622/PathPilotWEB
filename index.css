@@ -1,0 +1,129 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
+
+:root {
+  /* ---- surfaces (earthy) ---- */
+  --bg: #DFCCB1;
+  --bg-soft: #E8D9C1;
+  --surface: #AEB79A;
+  --surface-2: #98A086;
+  --surface-hover: #9DAA88;
+  --border: rgba(71, 56, 47, 0.20);
+  --border-soft: rgba(71, 56, 47, 0.14);
+
+  /* ---- text ---- */
+  --text-primary: #47382F;
+  --text-secondary: #6F6257;
+  --text-tertiary: #8A7A6C;
+
+  /* ---- accents: dusty-rose (primary) + sage (route / data) ---- */
+  --accent: #A76D5E;
+  --accent-strong: #846044;
+  --accent-soft: rgba(167, 109, 94, 0.18);
+  --accent-ink: #FFF9F0;
+  --route: #98A086;
+  --route-soft: rgba(152, 160, 134, 0.25);
+
+  /* ---- semantic ---- */
+  --success: #6F8F4E;
+  --danger: #B23B3B;
+  --danger-soft: rgba(178, 59, 59, 0.12);
+
+  /* ---- type ---- */
+  --font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* ---- shape / motion ---- */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --shadow-card: 0 20px 45px rgba(71, 56, 47, 0.18);
+  --shadow-glow: 0 0 0 1px rgba(167, 109, 94, 0.35), 0 8px 24px rgba(167, 109, 94, 0.18);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  font-family: var(--font-body);
+  color: var(--text-primary);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(1100px 520px at 82% -8%, rgba(152, 160, 134, 0.10), transparent 60%),
+    radial-gradient(900px 480px at -10% 10%, rgba(167, 109, 94, 0.10), transparent 55%),
+    var(--bg);
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+/* visible keyboard focus everywhere */
+:focus-visible {
+  outline: 2px solid var(--route);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* scrollbar, subtle */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--surface-2); border-radius: 20px; border: 2px solid var(--bg); }
+::-webkit-scrollbar-track { background: transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.brand-mark img,
+.top-icon img,
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
