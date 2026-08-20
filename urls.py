@@ -1,23 +1,23 @@
 from django.urls import path
 
 from .views import (
-    RoadmapAPIView,
-    KnowledgeVaultAPIView,
-    KnowledgeVaultDetailAPIView,
+    ChatbotAPIView,
+    ChatHistoryAPIView,
 )
 
 
 urlpatterns = [
-    # ai roadmap
-    path("roadmap/", RoadmapAPIView.as_view(), name="ai-roadmap"),
 
-    # knowledge vault - get all / create
-    path("vault/", KnowledgeVaultAPIView.as_view(), name="knowledge-vault"),
-
-    # knowledge vault - get one / update / delete
     path(
-        "vault/<int:resource_id>/",
-        KnowledgeVaultDetailAPIView.as_view(),
-        name="knowledge-vault-detail",
+        "chat/",
+        ChatbotAPIView.as_view(),
+        name="chatbot-chat",
     ),
+
+    path(
+        "history/",
+        ChatHistoryAPIView.as_view(),
+        name="chatbot-history",
+    ),
+
 ]

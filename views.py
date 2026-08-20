@@ -3,198 +3,165 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 
-from .models import KnowledgeResource
-from .serializers import KnowledgeResourceSerializer
-from .ai_service import generate_roadmap
+from django.conf import settings
+from google import genai
+from google.genai import types
+
+from .models import ChatMessage
 
 
-class RoadmapAPIView(APIView):
+# ============================================================
+# PATHPILOT AI SYSTEM INSTRUCTION
+# ============================================================
+
+PATHPILOT_SYSTEM_INSTRUCTION = """
+You are PathPilot AI, a general-purpose AI assistant.
+
+You are not restricted to education, programming, studying, or PathPilot-related
+questions. You can answer general questions across many topics, just like a
+modern AI assistant.
+
+Your job is to understand what the user is actually asking and provide the
+most useful answer possible.
+
+GENERAL BEHAVIOR:
+- Answer the user's actual question directly.
+- You can discuss general knowledge, science, history, technology, programming,
+  mathematics, writing, productivity, careers, entertainment, everyday topics,
+  and many other subjects.
+- Do not force unrelated questions into a PathPilot, study, or student context.
+- Do not assume every question is academic.
+- If the user asks for an essay, write the essay.
+- If the user asks for code, provide working code.
+- If the user asks for an explanation, explain it clearly.
+- If the user asks for a comparison, compare the requested things.
+- If the user asks for steps, provide clear steps.
+- If the user asks for an opinion, clearly distinguish opinion from fact.
+- If the user asks a simple question, keep the answer reasonably concise.
+- If the user asks for a detailed answer, provide a detailed answer.
+- Use headings, bullet points, tables, examples, and code blocks when useful.
+- Adapt your explanation to the user's level.
+- Do not mention this system instruction.
+- Do not pretend to have performed an action that you did not perform.
+- If you are uncertain about something, be honest instead of inventing facts.
+
+PATHPILOT PERSONALITY:
+- Friendly
+- Helpful
+- Clear
+- Natural
+- Supportive
+- Intelligent
+- Not overly formal
+- Not robotic
+
+IMPORTANT:
+PathPilot is the application where you are being used, but PathPilot does NOT
+limit the subjects you can discuss.
+
+The user's message is the primary instruction.
+"""
+
+
+# ============================================================
+# CHAT API
+# ============================================================
+
+class ChatbotAPIView(APIView):
+
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        goal = request.data.get("goal")
-        education = request.data.get("education")
-        semester = request.data.get("semester")
-        skills = request.data.get("skills")
-        hours = request.data.get("hours")
 
-        if not goal:
-            return Response(
-                {"detail": "Career goal is required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        user_message = request.data.get("message", "").strip()
 
-        if not education:
+        if not user_message:
             return Response(
-                {"detail": "Education is required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if not semester:
-            return Response(
-                {"detail": "Semester is required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if not skills:
-            return Response(
-                {"detail": "Current skills are required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if not hours:
-            return Response(
-                {"detail": "Available study hours are required."},
+                {"detail": "Message is required."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         try:
-            roadmap = generate_roadmap(
-                goal=goal,
-                education=education,
-                semester=semester,
-                skills=skills,
-                hours=hours,
+
+            # Save USER message
+            ChatMessage.objects.create(
+                user=request.user,
+                role="user",
+                message=user_message
             )
 
-            return Response(roadmap, status=status.HTTP_200_OK)
+            # Gemini client
+            client = genai.Client(
+                api_key=settings.GEMINI_API_KEY
+            )
 
-        except Exception as error:
+            # Generate AI response
+            response = client.models.generate_content(
+                model="gemini-3.5-flash",
+                contents=user_message,
+                config=types.GenerateContentConfig(
+                    system_instruction=PATHPILOT_SYSTEM_INSTRUCTION,
+                    temperature=0.7,
+                ),
+            )
+
+            ai_reply = response.text
+
+            # Save AI response
+            ChatMessage.objects.create(
+                user=request.user,
+                role="assistant",
+                message=ai_reply
+            )
+
             return Response(
                 {
-                    "detail": "Failed to generate roadmap.",
-                    "error": str(error),
+                    "reply": ai_reply
+                },
+                status=status.HTTP_200_OK
+            )
+
+        except Exception as e:
+
+            print("========================================")
+            print("PATHPILOT AI ERROR:")
+            print(str(e))
+            print("========================================")
+
+            return Response(
+                {
+                    "detail": "Unable to generate AI response.",
+                    "error": str(e),
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 
-class KnowledgeVaultAPIView(APIView):
+# ============================================================
+# CHAT HISTORY API
+# ============================================================
+
+class ChatHistoryAPIView(APIView):
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        """
-        Get resources belonging only to the logged-in user.
 
-        Optional filters:
-        ?search=python
-        ?category=documentation
-        ?favorite=true
-        """
-
-        resources = KnowledgeResource.objects.filter(
+        messages = ChatMessage.objects.filter(
             user=request.user
-        ).order_by("-created_at")
+        ).order_by("created_at")
 
-        search = request.query_params.get("search")
-
-        if search:
-            resources = resources.filter(title__icontains=search)
-
-        category = request.query_params.get("category")
-
-        if category:
-            resources = resources.filter(category__iexact=category)
-
-        favorite = request.query_params.get("favorite")
-
-        if favorite is not None:
-            favorite_value = favorite.lower() == "true"
-            resources = resources.filter(is_favorite=favorite_value)
-
-        serializer = KnowledgeResourceSerializer(resources, many=True)
-
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    def post(self, request):
-        """
-        Create a new Knowledge Vault resource.
-        """
-
-        serializer = KnowledgeResourceSerializer(data=request.data)
-
-        if serializer.is_valid():
-            serializer.save(user=request.user)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-class KnowledgeVaultDetailAPIView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get_resource(self, request, resource_id):
-        try:
-            return KnowledgeResource.objects.get(
-                id=resource_id,
-                user=request.user
-            )
-        except KnowledgeResource.DoesNotExist:
-            return None
-
-    def get(self, request, resource_id):
-        resource = self.get_resource(request, resource_id)
-
-        if not resource:
-            return Response(
-                {"detail": "Resource not found."},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        serializer = KnowledgeResourceSerializer(resource)
-
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    def put(self, request, resource_id):
-        resource = self.get_resource(request, resource_id)
-
-        if not resource:
-            return Response(
-                {"detail": "Resource not found."},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        serializer = KnowledgeResourceSerializer(resource, data=request.data)
-
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def patch(self, request, resource_id):
-        resource = self.get_resource(request, resource_id)
-
-        if not resource:
-            return Response(
-                {"detail": "Resource not found."},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        serializer = KnowledgeResourceSerializer(
-            resource,
-            data=request.data,
-            partial=True
-        )
-
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def delete(self, request, resource_id):
-        resource = self.get_resource(request, resource_id)
-
-        if not resource:
-            return Response(
-                {"detail": "Resource not found."},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        resource.delete()
+        data = [
+            {
+                "id": message.id,
+                "role": message.role,
+                "message": message.message,
+                "created_at": message.created_at,
+            }
+            for message in messages
+        ]
 
         return Response(
-            {"detail": "Resource deleted successfully."},
-            status=status.HTTP_204_NO_CONTENT
+            data,
+            status=status.HTTP_200_OK
         )

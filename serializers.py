@@ -1,25 +1,21 @@
 from rest_framework import serializers
 
-from .models import KnowledgeResource
+from .models import ChatMessage
 
 
-class KnowledgeResourceSerializer(serializers.ModelSerializer):
+class ChatMessageSerializer(serializers.ModelSerializer):
 
     class Meta:
-        model = KnowledgeResource
+        model = ChatMessage
+
         fields = [
             "id",
-            "title",
-            "url",
-            "category",
-            "tags",
-            "is_favorite",
+            "role",
+            "message",
             "created_at",
-            "updated_at",
         ]
 
         read_only_fields = [
             "id",
             "created_at",
-            "updated_at",
         ]
