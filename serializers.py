@@ -1,43 +1,25 @@
 from rest_framework import serializers
-from .models import Subject, StudySchedule
+
+from .models import KnowledgeResource
 
 
-class SubjectSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = Subject
-
-        fields = [
-            "id",
-            "subject_name",
-            "topic_name",
-            "description",
-            "pdf",
-            "is_completed",
-            "created_at",
-        ]
-
-        read_only_fields = [
-            "id",
-            "created_at",
-        ]
-
-
-class StudyScheduleSerializer(serializers.ModelSerializer):
+class KnowledgeResourceSerializer(serializers.ModelSerializer):
 
     class Meta:
-        model = StudySchedule
-
+        model = KnowledgeResource
         fields = [
             "id",
             "title",
-            "day",
-            "start_time",
-            "end_time",
+            "url",
+            "category",
+            "tags",
+            "is_favorite",
             "created_at",
+            "updated_at",
         ]
 
         read_only_fields = [
             "id",
             "created_at",
+            "updated_at",
         ]

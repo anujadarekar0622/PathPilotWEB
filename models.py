@@ -2,52 +2,43 @@ from django.db import models
 from django.contrib.auth.models import User
 
 
-class Task(models.Model):
-
-    TAG_CHOICES = [
-        ("Study", "Study"),
-        ("Coding", "Coding"),
-        ("Project", "Project"),
-        ("Personal", "Personal"),
-        ("Other", "Other"),
+class KnowledgeResource(models.Model):
+    CATEGORY_CHOICES = [
+        ("course", "Course"),
+        ("notes", "Notes"),
+        ("ebook", "E-Book"),
+        ("documentation", "Documentation"),
+        ("video", "Video"),
+        ("article", "Article"),
+        ("other", "Other"),
     ]
 
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        related_name="tasks"
+        related_name="knowledge_resources"
     )
 
-    title = models.CharField(
-        max_length=200
-    )
+    title = models.CharField(max_length=200)
 
-    description = models.TextField(
-        blank=True
-    )
+    url = models.URLField(max_length=500)
 
-    due_date = models.DateField(
-        null=True,
-        blank=True
-    )
-
-    duration = models.PositiveIntegerField(
-        default=30
-    )
-
-    tag = models.CharField(
+    category = models.CharField(
         max_length=30,
-        choices=TAG_CHOICES,
-        default="Study"
+        choices=CATEGORY_CHOICES,
+        default="other"
     )
 
-    is_completed = models.BooleanField(
-        default=False
+    tags = models.CharField(
+        max_length=500,
+        blank=True
     )
 
-    created_at = models.DateTimeField(
-        auto_now_add=True
-    )
+    is_favorite = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.title

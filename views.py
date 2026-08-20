@@ -1,170 +1,200 @@
-from rest_framework import viewsets, status
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
 
-from django.conf import settings
-from google import genai
-
-from .models import Subject, StudySchedule
-from .serializers import SubjectSerializer, StudyScheduleSerializer
-
-
-# ============================================================
-# SUBJECT API
-# ============================================================
-
-class SubjectViewSet(viewsets.ModelViewSet):
-    queryset = Subject.objects.all().order_by("-created_at")
-    serializer_class = SubjectSerializer
-    permission_classes = [IsAuthenticated]
+from .models import KnowledgeResource
+from .serializers import KnowledgeResourceSerializer
+from .ai_service import generate_roadmap
 
 
-# ============================================================
-# STUDY SCHEDULE API
-# ============================================================
-
-class StudyScheduleViewSet(viewsets.ModelViewSet):
-    queryset = StudySchedule.objects.all().order_by(
-        "day",
-        "start_time"
-    )
-    serializer_class = StudyScheduleSerializer
-    permission_classes = [IsAuthenticated]
-
-
-# ============================================================
-# AI STUDY TOOLS
-# ============================================================
-
-class AIStudyToolsAPIView(APIView):
-
+class RoadmapAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        goal = request.data.get("goal")
+        education = request.data.get("education")
+        semester = request.data.get("semester")
+        skills = request.data.get("skills")
+        hours = request.data.get("hours")
 
-        subject = request.data.get("subject", "").strip()
-        topic = request.data.get("topic", "").strip()
-        action = request.data.get("action", "").strip()
-        question = request.data.get("question", "").strip()
-
-        if not subject or not topic:
+        if not goal:
             return Response(
-                {"detail": "Subject and topic are required."},
-                status=status.HTTP_400_BAD_REQUEST,
+                {"detail": "Career goal is required."},
+                status=status.HTTP_400_BAD_REQUEST
             )
 
-        if action not in [
-            "summary",
-            "questions",
-            "explain",
-        ]:
+        if not education:
             return Response(
-                {"detail": "Invalid AI study action."},
-                status=status.HTTP_400_BAD_REQUEST,
+                {"detail": "Education is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not semester:
+            return Response(
+                {"detail": "Semester is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not skills:
+            return Response(
+                {"detail": "Current skills are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not hours:
+            return Response(
+                {"detail": "Available study hours are required."},
+                status=status.HTTP_400_BAD_REQUEST
             )
 
         try:
-
-            client = genai.Client(
-                api_key=settings.GEMINI_API_KEY
+            roadmap = generate_roadmap(
+                goal=goal,
+                education=education,
+                semester=semester,
+                skills=skills,
+                hours=hours,
             )
 
-            # ------------------------------------------------
-            # SUMMARY
-            # ------------------------------------------------
+            return Response(roadmap, status=status.HTTP_200_OK)
 
-            if action == "summary":
-
-                prompt = f"""
-Create a concise study summary for a student.
-
-Subject: {subject}
-Topic: {topic}
-
-Include:
-- Important concepts
-- Key definitions
-- Important points
-- A simple example where useful
-
-Make it easy to revise before an exam.
-Do not invent information unrelated to the topic.
-"""
-
-            # ------------------------------------------------
-            # QUESTIONS
-            # ------------------------------------------------
-
-            elif action == "questions":
-
-                prompt = f"""
-Create 5 useful practice questions for a student.
-
-Subject: {subject}
-Topic: {topic}
-
-Include a mixture of:
-- Conceptual questions
-- Short-answer questions
-- Exam-style questions
-
-Do not provide the answers.
-Keep the questions relevant to the given topic.
-"""
-
-            # ------------------------------------------------
-            # EXPLAIN
-            # ------------------------------------------------
-
-            else:
-
-                if not question:
-                    return Response(
-                        {
-                            "detail": "Question is required for explain action."
-                        },
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-                prompt = f"""
-You are explaining a topic to a student.
-
-Subject: {subject}
-Topic: {topic}
-
-Student's question:
-{question}
-
-Explain the answer clearly and simply.
-Use examples when helpful.
-Do not assume advanced knowledge unless necessary.
-"""
-
-            # ------------------------------------------------
-            # GEMINI
-            # ------------------------------------------------
-
-            response = client.models.generate_content(
-                model="gemini-3.5-flash",
-                contents=prompt,
-            )
-
+        except Exception as error:
             return Response(
                 {
-                    "action": action,
-                    "reply": response.text,
+                    "detail": "Failed to generate roadmap.",
+                    "error": str(error),
                 },
-                status=status.HTTP_200_OK,
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-        except Exception as e:
 
-            print("AI STUDY TOOLS ERROR:", e)
+class KnowledgeVaultAPIView(APIView):
+    permission_classes = [IsAuthenticated]
 
+    def get(self, request):
+        """
+        Get resources belonging only to the logged-in user.
+
+        Optional filters:
+        ?search=python
+        ?category=documentation
+        ?favorite=true
+        """
+
+        resources = KnowledgeResource.objects.filter(
+            user=request.user
+        ).order_by("-created_at")
+
+        search = request.query_params.get("search")
+
+        if search:
+            resources = resources.filter(title__icontains=search)
+
+        category = request.query_params.get("category")
+
+        if category:
+            resources = resources.filter(category__iexact=category)
+
+        favorite = request.query_params.get("favorite")
+
+        if favorite is not None:
+            favorite_value = favorite.lower() == "true"
+            resources = resources.filter(is_favorite=favorite_value)
+
+        serializer = KnowledgeResourceSerializer(resources, many=True)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        """
+        Create a new Knowledge Vault resource.
+        """
+
+        serializer = KnowledgeResourceSerializer(data=request.data)
+
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class KnowledgeVaultDetailAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_resource(self, request, resource_id):
+        try:
+            return KnowledgeResource.objects.get(
+                id=resource_id,
+                user=request.user
+            )
+        except KnowledgeResource.DoesNotExist:
+            return None
+
+    def get(self, request, resource_id):
+        resource = self.get_resource(request, resource_id)
+
+        if not resource:
             return Response(
-                {
-                    "detail": "Unable to generate AI study response.",
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                {"detail": "Resource not found."},
+                status=status.HTTP_404_NOT_FOUND
             )
+
+        serializer = KnowledgeResourceSerializer(resource)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request, resource_id):
+        resource = self.get_resource(request, resource_id)
+
+        if not resource:
+            return Response(
+                {"detail": "Resource not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = KnowledgeResourceSerializer(resource, data=request.data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def patch(self, request, resource_id):
+        resource = self.get_resource(request, resource_id)
+
+        if not resource:
+            return Response(
+                {"detail": "Resource not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = KnowledgeResourceSerializer(
+            resource,
+            data=request.data,
+            partial=True
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, resource_id):
+        resource = self.get_resource(request, resource_id)
+
+        if not resource:
+            return Response(
+                {"detail": "Resource not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        resource.delete()
+
+        return Response(
+            {"detail": "Resource deleted successfully."},
+            status=status.HTTP_204_NO_CONTENT
+        )

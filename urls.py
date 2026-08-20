@@ -1,47 +1,23 @@
 from django.urls import path
-from rest_framework.routers import DefaultRouter
 
 from .views import (
-    SubjectViewSet,
-    StudyScheduleViewSet,
-    AIStudyToolsAPIView,
+    RoadmapAPIView,
+    KnowledgeVaultAPIView,
+    KnowledgeVaultDetailAPIView,
 )
 
-
-# =========================
-# SUBJECT ROUTER
-# =========================
-
-router = DefaultRouter()
-
-# NOTE: "schedules" must be registered BEFORE the empty-prefix ""
-# route. Otherwise SubjectViewSet's detail route (^(?P<pk>...)/$)
-# matches "schedules" as a pk and shadows StudyScheduleViewSet,
-# causing a false 404.
-
-router.register(
-    "schedules",
-    StudyScheduleViewSet,
-    basename="schedule",
-)
-
-router.register(
-    "",
-    SubjectViewSet,
-    basename="subject",
-)
-
-
-# =========================
-# URL PATTERNS
-# =========================
 
 urlpatterns = [
+    # ai roadmap
+    path("roadmap/", RoadmapAPIView.as_view(), name="ai-roadmap"),
+
+    # knowledge vault - get all / create
+    path("vault/", KnowledgeVaultAPIView.as_view(), name="knowledge-vault"),
+
+    # knowledge vault - get one / update / delete
     path(
-        "ai-tools/",
-        AIStudyToolsAPIView.as_view(),
-        name="ai-study-tools",
+        "vault/<int:resource_id>/",
+        KnowledgeVaultDetailAPIView.as_view(),
+        name="knowledge-vault-detail",
     ),
 ]
-
-urlpatterns += router.urls
